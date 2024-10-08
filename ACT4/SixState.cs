@@ -32,7 +32,5 @@ namespace ACT4
             Y[4] = f.Y[4];
             Y[5] = f.Y[5];
         }
-
-        //
     }
 }

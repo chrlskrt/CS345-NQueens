@@ -16,14 +16,18 @@ namespace ACT4
         int side;
         int n = 6;
         SixState startState;
-        SixState currentState;
+        //SixState currentState;
+        SixState[] states;
+
         int moveCounter;
+        int stateNum;
+        int bestStateIdx;
 
         //bool stepMove = true;
 
-        int[,] hTable;
-        ArrayList bMoves;
-        Object chosenMove;
+        int[,,] hTable;
+        ArrayList[] bMoves;
+        Object[] chosenMove;
 
         public Form1()
         {
@@ -32,7 +36,16 @@ namespace ACT4
             side = pictureBox1.Width / n;
 
             startState = randomSixState();
-            currentState = new SixState(startState);
+            //currentState = new SixState(startState);
+            stateNum = 3;
+            bestStateIdx = 0;
+
+            states = new SixState[stateNum];
+            states[0] = new SixState(startState);
+            states[1] = randomSixState();
+            states[2] = randomSixState();
+
+            chosenMove = new object[stateNum];
 
             updateUI();
             label1.Text = "Attacking pairs: " + getAttackingPairs(startState);
@@ -44,19 +57,28 @@ namespace ACT4
             pictureBox2.Refresh();
 
             //label1.Text = "Attacking pairs: " + getAttackingPairs(startState);
-            label3.Text = "Attacking pairs: " + getAttackingPairs(currentState);
+            //label3.Text = "Attacking pairs: " + getAttackingPairs(currentState);
+            label3.Text = "Attacking pairs: " + getAttackingPairs(states[bestStateIdx]);
             label4.Text = "Moves: " + moveCounter;
-            hTable = getHeuristicTableForPossibleMoves(currentState);
+            hTable = getHeuristicTableForPossibleMoves(states);
             bMoves = getBestMoves(hTable);
 
             listBox1.Items.Clear();
-            foreach (Point move in bMoves)
+            for (int i = 0; i < stateNum; i++)
+            {
+                if (bMoves[i].Count > 0)
+                {
+                    chosenMove[i] = chooseMove(bMoves[i]);
+                }
+            }
+
+            foreach (Point move in bMoves[bestStateIdx])
             {
                 listBox1.Items.Add(move);
             }
 
-            if (bMoves.Count > 0)
-                chosenMove = chooseMove(bMoves);
+            //if (bMoves.Count > 0)
+            //    chosenMove = chooseMove(bMoves);
             label2.Text = "Chosen move: " + chosenMove;
         }
 
@@ -90,7 +112,7 @@ namespace ACT4
                         e.Graphics.FillRectangle(Brushes.Black, i * side, j * side, side, side);
                     }
                     // draw queens
-                    if (j == currentState.Y[i])
+                    if (j == states[bestStateIdx].Y[i])
                         e.Graphics.FillEllipse(Brushes.Fuchsia, i * side, j * side, side, side);
                 }
             }
@@ -138,46 +160,69 @@ namespace ACT4
             return attackers;
         }
 
-        private int[,] getHeuristicTableForPossibleMoves(SixState thisState)
+        private int[,,] getHeuristicTableForPossibleMoves(SixState[] thisState)
         {
-            int[,] hStates = new int[n, n];
+            int[,,] hStates = new int[stateNum, n, n];
 
-            for (int i = 0; i < n; i++) // go through the indices
+            for (int i = 0; i < stateNum; i++) // go through the indices
             {
                 for (int j = 0; j < n; j++) // replace them with a new value
                 {
-                    SixState possible = new SixState(thisState);
-                    possible.Y[i] = j;
-                    hStates[i, j] = getAttackingPairs(possible);
+                    for (int k = 0; k < n; k++)
+                    {
+                        SixState possible = new SixState(thisState[i]);
+                        possible.Y[j] = k;
+                        hStates[i, j, k] = getAttackingPairs(possible);
+                    }
                 }
             }
 
             return hStates;
         }
 
-        private ArrayList getBestMoves(int[,] heuristicTable)
+        private ArrayList[] getBestMoves(int[,,] heuristicTable)
         {
-            ArrayList bestMoves = new ArrayList();
-            int bestHeuristicValue = heuristicTable[0, 0];
-
-            for (int i = 0; i < n; i++)
+            ArrayList[] bestMoves = new ArrayList[stateNum];
+            for (int i = 0; i < stateNum; i++)
             {
+                bestMoves[i] = new ArrayList();
+            }
+
+            int[] bestHeuristicValue = new int[stateNum];
+
+            for (int i = 0; i < stateNum; i++)
+            {
+                bestHeuristicValue[i] = heuristicTable[i, 0, 0];
                 for (int j = 0; j < n; j++)
                 {
-                    if (bestHeuristicValue > heuristicTable[i, j])
+                    for (int k = 0; k < n; k++)
                     {
-                        bestHeuristicValue = heuristicTable[i, j];
-                        bestMoves.Clear();
-                        if (currentState.Y[i] != j)
-                            bestMoves.Add(new Point(i, j));
-                    } else if (bestHeuristicValue == heuristicTable[i,j])
-                    {
-                        if (currentState.Y[i] != j)
-                            bestMoves.Add(new Point(i, j));
+                        if (bestHeuristicValue[i] > heuristicTable[i, j, k])
+                        {
+                            bestHeuristicValue[i] = heuristicTable[i, j, k];
+                            bestMoves[i].Clear();
+                            if (states[i].Y[j] != k)
+                                bestMoves[i].Add(new Point(j,k));
+                        }
+                        
+                        else if (bestHeuristicValue[i] == heuristicTable[i, j, k])
+                        {
+                            if (states[i].Y[j] != k)
+                                bestMoves[i].Add(new Point(j, k));
+                        }
                     }
                 }
             }
-            label5.Text = "Possible Moves (H="+bestHeuristicValue+")";
+
+            for (int i = 0; i < stateNum; i++)
+            {
+                if (bestHeuristicValue[bestStateIdx] > bestHeuristicValue[i])
+                {
+                    bestStateIdx = i;
+                }
+            }
+
+            label5.Text = "Possible Moves (H=" + bestHeuristicValue[bestStateIdx] +")";
             return bestMoves;
         }
 
@@ -194,12 +239,18 @@ namespace ACT4
         {
             for (int i = 0; i < n; i++)
             {
-                startState.Y[i] = currentState.Y[i];
+                startState.Y[i] = states[bestStateIdx].Y[i];
             }
-            currentState.Y[move.X] = move.Y;
+            states[bestStateIdx].Y[move.X] = move.Y;
             moveCounter++;
 
-            chosenMove = null;
+            //chosenMove = null;
+
+            for (int i = 0; i < stateNum; i++)
+            {
+                chosenMove[i] = null;
+            }
+
             updateUI();
         }
 
@@ -210,27 +261,35 @@ namespace ACT4
 
         private void button1_Click(object sender, EventArgs e)
         {
-            if (getAttackingPairs(currentState) > 0)
-               executeMove((Point)chosenMove);
+            if (getAttackingPairs(states[bestStateIdx]) > 0)
+                executeMove((Point)chosenMove[bestStateIdx]);
         }
 
         private void button3_Click(object sender, EventArgs e)
         {
-            startState = randomSixState();
-            currentState = new SixState(startState);
+            states[0] = startState = randomSixState();
+            //currentState = new SixState(startState);
+
+            for(int i = 0;i < stateNum; i++)
+            {
+                states[i] = new SixState();
+            }
 
             moveCounter = 0;
 
             updateUI();
             pictureBox1.Refresh();
-            label1.Text = "Attacking pairs: " + getAttackingPairs(startState);
+            label1.Text = "Attacking pairs: " + getAttackingPairs(states[bestStateIdx]);
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
-            while (getAttackingPairs(currentState) > 0)
+            while (getAttackingPairs(states[bestStateIdx]) > 0)
             {
-                executeMove((Point)chosenMove);
+                for (int i = 0; i < stateNum; i++)
+                {
+                    executeMove((Point)chosenMove[i]);
+                }
             }
         }
 
